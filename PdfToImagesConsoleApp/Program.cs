@@ -1,5 +1,6 @@
 ﻿using GemBox.Pdf;
 using System;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 
@@ -7,6 +8,21 @@ namespace PdfToImagesConsoleApp
 {
     class Program
     {
+        public enum FileType : int
+        {
+            [Description(".jpg")]
+            JPG = 1,
+            [Description(".png")]
+            PNG = 2,
+            [Description(".gif")]
+            GIF = 3,
+            [Description(".tiff")]
+            TIFF = 4,
+            [Description(".bmp")]
+            BMP = 5,
+            [Description(".wmp")]
+            WMP =6
+        }
         private static void PdfToImage(string filePath, int outputType, string outputDirectory)
         {
             // For free user, only allow to page which has only 2 pages.
@@ -19,16 +35,41 @@ namespace PdfToImagesConsoleApp
                 {
                     var docObj = new PdfDocument();
                     docObj.Pages.AddClone(page);
+                    string extType = ".jpg";
 
-                    var img = new ImageSaveOptions();
-                    img.PixelFormat = PixelFormat.Default;
+                    var imgOption = new ImageSaveOptions();
+                    imgOption.PixelFormat = PixelFormat.Default;
                     /* Please presses F12 to see the description
                         img.Height = 400;
                         img.Width = 400;
                         img.DpiX = 100;
                         img.DpiY = 100;
                     */
-                    docObj.Save(outputDirectory + Path.GetFileNameWithoutExtension(filePath).ToString()+ "_" + i.ToString() + ((outputType == 1) ? ".jpg" : ".png"), img);
+                    switch (outputType)
+                    {
+                        case (int)FileType.JPG:
+                            extType = ".jpg";
+                            break;
+                        case (int)FileType.PNG:
+                            extType = ".png";
+                            break;
+                        case (int)FileType.GIF:
+                            extType = ".gif";
+                            break;
+                        case (int)FileType.TIFF:
+                            extType = ".tiff";
+                            break;
+                        case (int)FileType.BMP:
+                            extType = ".bmp";
+                            break;
+                        case (int)FileType.WMP:
+                            extType = ".wmp";
+                            break;
+                        default:
+                            break;
+                    }
+                    var img = outputDirectory + Path.GetFileNameWithoutExtension(filePath).ToString() + "_" + i.ToString() + extType;
+                    docObj.Save(img, imgOption);
                     i++;
                 }
             }
@@ -86,12 +127,16 @@ namespace PdfToImagesConsoleApp
                 Console.WriteLine(" |          ********************************                       | ");
                 Console.WriteLine(" |          *       => 1. JPG Type         *                       | ");
                 Console.WriteLine(" |          *       => 2. PNG Type         *                       | ");
+                Console.WriteLine(" |          *       => 3. GIF Type         *                       | ");
+                Console.WriteLine(" |          *       => 4. TIFF Type        *                       | ");
+                Console.WriteLine(" |          *       => 5. BMP Type         *                       | ");
+                Console.WriteLine(" |          *       => 6. WMP Type         *                       | ");
                 Console.WriteLine(" |          *       => 0. To EXIT          *                       | ");
                 Console.WriteLine(" |          *******************************                        | ");
                 Console.WriteLine("  -----------------------------------------------------------------  ");
-                
-                int outputType = Int32.TryParse(Console.ReadLine(), out outputType) ? outputType : -1;
-                if (outputType != 0 && (outputType == 1 || outputType == 2))
+                Console.Write("Your Choice:  ");
+                int outputType = int.TryParse(Console.ReadLine(), out outputType) ? outputType : -1;
+                if (outputType != 0 && (outputType == 1 || outputType == 2 || outputType == 3 || outputType == 4 || outputType == 5 || outputType == 6))
                 {
                     Console.Clear();
                     Console.WriteLine("-----------------------------------------------------------------------");
@@ -100,9 +145,11 @@ namespace PdfToImagesConsoleApp
                     switch (outputType)
                     {
                         case 1:
-                            ConvertToImages(outputType);
-                            break;
                         case 2:
+                        case 3:
+                        case 4:
+                        case 5:
+                        case 6:
                             ConvertToImages(outputType);
                             break;
                         default:
