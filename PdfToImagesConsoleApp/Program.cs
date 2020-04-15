@@ -3,6 +3,8 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using iTextSharp.text;
+using iTextSharp.text.pdf;
 
 namespace PdfToImagesConsoleApp
 {
@@ -23,17 +25,88 @@ namespace PdfToImagesConsoleApp
             [Description(".wmp")]
             WMP =6
         }
+        
+        private static void SplittingPdfFile(string originFilePath, string outputFilePath)
+        {
+            var inputFiles = Directory.GetFiles(originFilePath).ToList();
+            foreach (var fileItem in inputFiles)
+            {
+                int interval = 1;
+                int pageNameSuffix = 0;
+                PdfReader reader = new PdfReader(fileItem);
+                FileInfo file = new FileInfo(fileItem);
+                string pdfFileName = file.Name.Substring(0, file.Name.LastIndexOf(".")) + "-";
+
+                for (int pageNumber = 1; pageNumber <= reader.NumberOfPages; pageNumber += interval)
+                {
+                    pageNameSuffix++;
+                    string newPdfFileName = string.Format(pdfFileName + "{0}", pageNameSuffix);
+                    SplitAndSaveInterval(fileItem, outputFilePath, pageNumber, interval, newPdfFileName);
+                }
+            }
+            
+        }
+        private static void SplitAndSaveInterval(string pdfFilePath, string outputPath, int startPage, int interval, string pdfFileName)
+        {
+            using (PdfReader reader = new PdfReader(pdfFilePath))
+            {
+                Document document = new Document();
+                PdfCopy copy = new PdfCopy(document, new FileStream(outputPath + "\\" + pdfFileName + ".pdf", FileMode.Create));
+                document.Open();
+
+                for (int pagenumber = startPage; pagenumber < (startPage + interval); pagenumber++)
+                {
+                    if (reader.NumberOfPages >= pagenumber)
+                    {
+                        copy.AddPage(copy.GetImportedPage(reader, pagenumber));
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                document.Close();
+            }
+        }
+        private static void PdfToImageByItextSharp(string filePath, int outputType, string outputDirectory)
+        {
+            var pdf = new PdfReader(filePath);
+            int n = pdf.NumberOfPages;
+            for (int i = 1; i <= n; i++)
+            {
+                var pg = pdf.GetPageN(i);
+                var res = PdfReader.GetPdfObject(pg.Get(PdfName.RESOURCES)) as PdfDictionary;
+                var xobj = PdfReader.GetPdfObject(res.Get(PdfName.XOBJECT)) as PdfDictionary;
+                if (xobj == null) continue;
+
+                var keys = xobj.Keys;
+                if (keys.Count == 0) continue;
+
+                var obj = xobj.Get(keys.ElementAt(0));
+                if (!obj.IsIndirect()) continue;
+
+                var tg = PdfReader.GetPdfObject(obj) as PdfDictionary;
+                var type = PdfReader.GetPdfObject(tg.Get(PdfName.SUBTYPE)) as PdfName;
+                if (!PdfName.IMAGE.Equals(type)) continue;
+
+                int XrefIndex = (obj as PRIndirectReference).Number;
+                var pdfStream = pdf.GetPdfObject(XrefIndex) as PRStream;
+                var data = PdfReader.GetStreamBytesRaw(pdfStream);
+                var jpeg = Path.Combine(outputDirectory, string.Format("{0:0000}.jpg", i));
+                File.WriteAllBytes(jpeg, data);
+            }
+        }
         private static void PdfToImage(string filePath, int outputType, string outputDirectory)
         {
             // For free user, only allow to page which has only 2 pages.
             // More than 2 pages, we must purchase the license.
             ComponentInfo.SetLicense("FREE-LIMITED-KEY");
-            using (PdfDocument document = PdfDocument.Load(filePath))
+            using (GemBox.Pdf.PdfDocument document = GemBox.Pdf.PdfDocument.Load(filePath))
             {
                 int i = 1;
                 foreach (var page in document.Pages)
                 {
-                    var docObj = new PdfDocument();
+                    var docObj = new GemBox.Pdf.PdfDocument();
                     docObj.Pages.AddClone(page);
                     string extType = ".jpg";
 
@@ -103,6 +176,7 @@ namespace PdfToImagesConsoleApp
                     switch (fileType)
                     {
                         case ".pdf":
+                            //PdfToImageByItextSharp(file, outputType, outputDirectory);
                             PdfToImage(file, outputType, outputDirectory);
                             break;
                         case ".tif":
@@ -131,12 +205,13 @@ namespace PdfToImagesConsoleApp
                 Console.WriteLine(" |          *       => 4. TIFF Type        *                       | ");
                 Console.WriteLine(" |          *       => 5. BMP Type         *                       | ");
                 Console.WriteLine(" |          *       => 6. WMP Type         *                       | ");
+                Console.WriteLine(" |          *       => 7. Splitting PDF    *                       | ");
                 Console.WriteLine(" |          *       => 0. To EXIT          *                       | ");
                 Console.WriteLine(" |          *******************************                        | ");
                 Console.WriteLine("  -----------------------------------------------------------------  ");
                 Console.Write("Your Choice:  ");
                 int outputType = int.TryParse(Console.ReadLine(), out outputType) ? outputType : -1;
-                if (outputType != 0 && (outputType == 1 || outputType == 2 || outputType == 3 || outputType == 4 || outputType == 5 || outputType == 6))
+                if (outputType != 0 && (outputType == 1 || outputType == 2 || outputType == 3 || outputType == 4 || outputType == 5 || outputType == 6 || outputType == 7))
                 {
                     Console.Clear();
                     Console.WriteLine("-----------------------------------------------------------------------");
@@ -151,6 +226,11 @@ namespace PdfToImagesConsoleApp
                         case 5:
                         case 6:
                             ConvertToImages(outputType);
+                            break;
+                        case 7:
+                            string inputDirectory = System.IO.Directory.GetCurrentDirectory().Replace(@"\bin\Debug", @"\input");
+                            string outputDirectory = System.IO.Directory.GetCurrentDirectory().Replace(@"\bin\Debug", @"\output\");
+                            SplittingPdfFile(inputDirectory, outputDirectory);
                             break;
                         default:
                             Console.WriteLine("Invalid Option! Are you kidding me? ");
